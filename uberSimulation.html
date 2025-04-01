@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulación Uber - SRTF</title>
+    <style>
+        /* Estilos básicos para la página */
+        body { font-family: Arial, sans-serif; text-align: center; }
+        .container { max-width: 600px; margin: auto; }
+        .drivers, .rides { margin: 20px 0; }
+        .driver, .ride { padding: 10px; border: 1px solid #ddd; margin: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Simulación Uber - SRTF</h1>
+        <!-- Botón para solicitar un nuevo viaje -->
+        <button onclick="simulateRide()">Solicitar Viaje</button>
+        
+        <!-- Sección para mostrar los conductores -->
+        <h2>Conductores</h2>
+        <div id="drivers" class="drivers"></div>
+        
+        <!-- Sección para mostrar los viajes pendientes -->
+        <h2>Viajes Pendientes</h2>
+        <div id="rides" class="rides"></div>
+    </div>
+
+    <script>
+        // Clase Ride (Viaje)
+        class Ride {
+            constructor(id, pickup, dropoff, duration) {
+                this.id = id; // Identificador único del viaje
+                this.pickup = pickup; // Punto de recogida
+                this.dropoff = dropoff; // Punto de destino
+                this.duration = duration; // Duración estimada del viaje en minutos
+            }
+        }
+
+        // Clase Driver (Conductor)
+        class Driver {
+            constructor(id, name) {
+                this.id = id; // Identificador único del conductor
+                this.name = name; // Nombre del conductor
+                this.remainingTime = 0; // Tiempo restante para completar el viaje actual
+                this.currentRide = null; // Viaje actual asignado al conductor
+            }
+
+            // Asigna un viaje al conductor
+            assignRide(ride) {
+                this.currentRide = ride; // Asigna el viaje actual
+                this.remainingTime = ride.duration; // Actualiza el tiempo restante con la duración del viaje
+                console.log(`${this.name} asignado al viaje ${ride.id} (${ride.pickup} -> ${ride.dropoff})`);
+            }
+
+            // Reduce el tiempo restante del conductor en cada unidad de tiempo
+            tick() {
+                if (this.remainingTime > 0) {
+                    this.remainingTime--; // Reduce el tiempo restante
+                    if (this.remainingTime === 0) {
+                        this.completeRide(); // Completa el viaje si el tiempo llega a 0
+                    }
+                }
+            }
+
+            // Completa el viaje actual
+            completeRide() {
+                if (this.currentRide) {
+                    console.log(`${this.name} completó el viaje ${this.currentRide.id}`);
+                    this.currentRide = null; // El conductor queda libre
+                    this.remainingTime = 0; // Resetea el tiempo restante
+                }
+            }
+        }
+
+        // Clase UberSimulation (Simulación de Uber)
+        class UberSimulation {
+            constructor() {
+                this.drivers = []; // Lista de conductores disponibles
+                this.queue = []; // Cola de viajes pendientes
+            }
+
+            // Agrega un conductor a la lista de conductores
+            addDriver(driver) {
+                this.drivers.push(driver);
+            }
+
+            // Solicita un viaje y lo agrega a la cola
+            requestRide(ride) {
+                this.queue.push(ride); // Agrega el viaje a la cola
+                this.assignRide(); // Intenta asignar el viaje a un conductor
+                updateDisplay(); // Actualiza la interfaz
+            }
+
+            // Asigna un viaje a un conductor según el algoritmo SRTF
+            assignRide() {
+                if (this.queue.length === 0) return; // Si no hay viajes en la cola, no hace nada
+
+                // Ordena los conductores por el menor tiempo restante (SRTF)
+                this.drivers.sort((a, b) => a.remainingTime - b.remainingTime);
+
+                let driver = this.drivers[0]; // Selecciona el conductor con menor tiempo restante
+                if (driver.remainingTime === 0 && this.queue.length > 0) { // Si el conductor está disponible
+                    let ride = this.queue.shift(); // Toma el primer viaje de la cola
+                    driver.assignRide(ride); // Asigna el viaje al conductor
+                }
+                updateDisplay(); // Actualiza la interfaz
+            }
+
+            // Simula el paso del tiempo
+            simulateTime() {
+                setInterval(() => {
+                    this.drivers.forEach(driver => driver.tick()); // Reduce el tiempo restante de cada conductor
+                    this.assignRide(); // Intenta asignar nuevos viajes
+                    updateDisplay(); // Actualiza la interfaz
+                }, 1000); // Cada segundo representa un minuto en la simulación
+            }
+        }
+
+        // Instancia de la simulación
+        const uber = new UberSimulation();
+        // Agrega conductores a la simulación
+        uber.addDriver(new Driver(1, "Carlos"));
+        uber.addDriver(new Driver(2, "Ana"));
+        uber.addDriver(new Driver(3, "Luis"));
+
+        // Variable para generar IDs únicos para los viajes
+        let rideId = 101;
+
+        // Función para simular un nuevo viaje
+        function simulateRide() {
+            const locations = ["Centro", "Aeropuerto", "Parque", "Estación", "Hotel", "Museo", "Teatro", "Playa"];
+            let pickup = locations[Math.floor(Math.random() * locations.length)]; // Genera un punto de recogida aleatorio
+            let dropoff = locations[Math.floor(Math.random() * locations.length)]; // Genera un punto de destino aleatorio
+            let duration = Math.floor(Math.random() * 15) + 5; // Genera una duración aleatoria entre 5 y 20 minutos
+            uber.requestRide(new Ride(rideId++, pickup, dropoff, duration)); // Solicita un nuevo viaje
+        }
+
+        // Función para actualizar la interfaz
+        function updateDisplay() {
+            // Actualiza la sección de conductores
+            const driversDiv = document.getElementById("drivers");
+            driversDiv.innerHTML = ""; // Limpia el contenido actual
+            uber.drivers.forEach(driver => {
+                let div = document.createElement("div");
+                div.className = "driver";
+                div.innerHTML = `<strong>${driver.name}</strong><br>Tiempo Restante: ${driver.remainingTime} min<br>` + 
+                                (driver.currentRide ? `En viaje: ${driver.currentRide.pickup} -> ${driver.currentRide.dropoff}` : "Disponible");
+                driversDiv.appendChild(div);
+            });
+
+            // Actualiza la sección de viajes pendientes
+            const ridesDiv = document.getElementById("rides");
+            ridesDiv.innerHTML = ""; // Limpia el contenido actual
+            uber.queue.forEach(ride => {
+                let div = document.createElement("div");
+                div.className = "ride";
+                div.innerHTML = `Viaje ${ride.id}: ${ride.pickup} -> ${ride.dropoff} (${ride.duration} min)`;
+                ridesDiv.appendChild(div);
+            });
+        }
+
+        // Inicializa la simulación de tiempo
+        uber.simulateTime();
+        // Inicializa la interfaz al cargar la página
+        updateDisplay();
+    </script>
+</body>
+</html>
